@@ -732,7 +732,7 @@
 
         // Configuration
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1loAhaiLAHh4eTW1wN7dwvXvqbKxNTe2a19oXSFqH490/export?format=csv&gid=0';
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyVqlJey-IOlhUUV2nmVEjvXVJXcerpAgj0s6fpWjVZrL_2eiNIrDi9CLRko7VW2Y38Rg/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzi_nYR9goAoexh8HnzvINENZ4llG84BHf_MjEa1p2pFl7Ym3df9P3cMF2DuZsqJ-w7oQ/exec';
 
         // Tab Switching
         document.querySelectorAll('.tab-button').forEach(button => {
@@ -789,7 +789,7 @@
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 center: { lat: 20.9674, lng: -89.5926 }, // Mérida, Yucatán
-                zoom: 17,
+                zoom: 18,
                 mapTypeId: 'satellite', // Vista satelital
                 gestureHandling: 'cooperative',
                 styles: [
@@ -1004,6 +1004,10 @@
                 fullAddress += ` (${selectedCoordinates.lat.toFixed(6)}, ${selectedCoordinates.lng.toFixed(6)})`;
             }
             
+            // Extraer solo el número del precio (sin formato)
+            const priceText = document.getElementById('total-price').textContent;
+            const priceNumber = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+            
             const data = {
                 firstName: document.getElementById('first-name').value.trim(),
                 lastName: document.getElementById('last-name').value.trim(),
@@ -1012,7 +1016,7 @@
                 address: fullAddress,
                 cobertura: document.getElementById('cobertura').value,
                 totalM2: document.getElementById('total-m2').textContent,
-                totalPrice: document.getElementById('total-price').textContent
+                totalPrice: priceNumber // Solo el número, sin formato
             };
 
             const submitButton = document.getElementById('quote-button');
