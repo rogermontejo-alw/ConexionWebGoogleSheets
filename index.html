@@ -723,17 +723,17 @@
     <script>
         // Global Variables
         let map;
-        let drawingManager;
-        let selectedShape;
+        let polygon;
+        let markers = [];
+        let points = [];
         let autocomplete;
         let products = [];
         let selectedAddress = '';
         let selectedCoordinates = null;
-        let vertexMarkers = []; // Array para guardar los marcadores de vértices
 
         // Configuration
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1loAhaiLAHh4eTW1wN7dwvXvqbKxNTe2a19oXSFqH490/export?format=csv&gid=0';
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6iUXpBe4N4vDXJPFnEuX3VQPWiCF8sfOwjeb0T8wCsA8F_YU7JksUghJ7UVmUG-Kg/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbychzvpX48ijnGNoL7WMKCHFOZWjgFRNZ0l8YDu3uWylTYzEF1Mfvbtc3EY9TXLHeqPzg/exec';
 
         // Tab Switching
         document.querySelectorAll('.tab-button').forEach(button => {
@@ -801,92 +801,25 @@
                         elementType: "labels",
                         stylers: [{ visibility: "off" }]
                     }
-                ]
+                ],
+                cursor: 'crosshair'
             });
 
-            drawingManager = new google.maps.drawing.DrawingManager({
-                drawingMode: google.maps.drawing.OverlayType.POLYGON,
-                drawingControl: true,
-                drawingControlOptions: {
-                    position: google.maps.ControlPosition.TOP_CENTER,
-                    drawingModes: ['polygon']
-                },
-                polygonOptions: {
-                    editable: true,
-                    draggable: true,
-                    fillColor: '#FFD700',
-                    fillOpacity: 0.45,
-                    strokeColor: '#FFD700',
-                    strokeWeight: 3
-                }
+            // Inicializar polígono
+            polygon = new google.maps.Polygon({
+                strokeColor: '#FFD700',
+                strokeOpacity: 0.8,
+                strokeWeight: 3,
+                fillColor: '#FFD700',
+                fillOpacity: 0.45,
+                editable: false,
+                draggable: false
             });
+            polygon.setMap(map);
 
-            drawingManager.setMap(map);
-
-            // Listener para mostrar marcadores mientras se dibuja
-            google.maps.event.addListener(drawingManager, 'polylinecomplete', function(polyline) {
-                polyline.setMap(null);
-            });
-
-            // Agregar marcadores mientras se dibuja el polígono
-            let drawingPolyline = null;
-            google.maps.event.addListener(map, 'click', function(event) {
-                if (drawingManager.getDrawingMode() === google.maps.drawing.OverlayType.POLYGON) {
-                    // Agregar marcador inmediatamente al hacer clic
-                    const marker = new google.maps.Marker({
-                        position: event.latLng,
-                        map: map,
-                        icon: {
-                            path: 'M 0,0 C -2,-20 -10,-22 -10,-30 A 10,10 0 1,1 10,-30 C 10,-22 2,-20 0,0 z',
-                            fillColor: '#FF5722',
-                            fillOpacity: 1,
-                            strokeColor: '#FFFFFF',
-                            strokeWeight: 2,
-                            scale: 1.2,
-                            anchor: new google.maps.Point(0, 0)
-                        },
-                        draggable: false,
-                        clickable: false,
-                        zIndex: -1
-                    });
-                    vertexMarkers.push(marker);
-                }
-            });
-
-            google.maps.event.addListener(drawingManager, 'overlaycomplete', function(event) {
-                if (selectedShape) {
-                    selectedShape.setMap(null);
-                    clearVertexMarkers();
-                }
-                selectedShape = event.overlay;
-                
-                // Actualizar los colores del polígono seleccionado para mejor visibilidad
-                selectedShape.setOptions({
-                    fillColor: '#FFD700',
-                    fillOpacity: 0.45,
-                    strokeColor: '#FFD700',
-                    strokeWeight: 3
-                });
-                
-                drawingManager.setDrawingMode(null);
-                
-                // Agregar marcadores en cada vértice (reemplazar los temporales)
-                clearVertexMarkers();
-                addVertexMarkers();
-                
-                google.maps.event.addListener(selectedShape.getPath(), 'insert_at', function() {
-                    calculateArea();
-                    addVertexMarkers();
-                });
-                google.maps.event.addListener(selectedShape.getPath(), 'remove_at', function() {
-                    calculateArea();
-                    addVertexMarkers();
-                });
-                google.maps.event.addListener(selectedShape.getPath(), 'set_at', function() {
-                    calculateArea();
-                    addVertexMarkers();
-                });
-                calculateArea();
+            // Evento de clic en el mapa para agregar puntos
+            map.addListener('click', function(event) {
+                addPoint(event.latLng);
             });
 
             // Autocomplete
@@ -920,14 +853,72 @@
             document.getElementById('clear-button').addEventListener('click', clearDrawing);
         }
 
+        function addPoint(location) {
+            // Agregar marcador numerado y arrastrable con imagen SVG personalizada
+            const marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                label: {
+                    text: (markers.length + 1).toString(),
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '16px'
+                },
+                icon: {
+                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">
+                            <path fill="#FF5722" stroke="#FFFFFF" stroke-width="1" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                            <circle cx="12" cy="9" r="3.5" fill="#FFFFFF"/>
+                        </svg>
+                    `),
+                    scaledSize: new google.maps.Size(48, 48),
+                    anchor: new google.maps.Point(24, 48),
+                    labelOrigin: new google.maps.Point(24, 11)
+                },
+                draggable: true,
+                animation: google.maps.Animation.DROP
+            });
+
+            const markerIndex = markers.length;
+            markers.push(marker);
+            points.push(location);
+
+            // Evento cuando se arrastra el marcador
+            marker.addListener('drag', function(event) {
+                points[markerIndex] = event.latLng;
+                polygon.setPath(points);
+                calculateArea();
+            });
+            
+            // Evento cuando termina de arrastrar
+            marker.addListener('dragend', function(event) {
+                points[markerIndex] = event.latLng;
+                polygon.setPath(points);
+                calculateArea();
+            });
+
+            // Actualizar polígono
+            polygon.setPath(points);
+
+            // Calcular área
+            calculateArea();
+        }
+
         function calculateArea() {
-            if (!selectedShape) return;
-            const area = google.maps.geometry.spherical.computeArea(selectedShape.getPath());
+            if (points.length < 3) {
+                document.getElementById('total-m2').textContent = '0.00';
+                document.getElementById('total-price').textContent = '$0.00';
+                calculatePrice();
+                updateSummary();
+                return;
+            }
+
+            const area = google.maps.geometry.spherical.computeArea(points);
             document.getElementById('total-m2').textContent = area.toFixed(2);
             
             // Calcular el centro del polígono dibujado
             const bounds = new google.maps.LatLngBounds();
-            selectedShape.getPath().forEach(function(latLng) {
+            points.forEach(function(latLng) {
                 bounds.extend(latLng);
             });
             const center = bounds.getCenter();
@@ -939,66 +930,37 @@
             };
             
             calculatePrice();
-            updateSummary(); // Update summary in real-time on desktop
-        }
-
-        function addVertexMarkers() {
-            // Limpiar marcadores existentes
-            clearVertexMarkers();
-            
-            if (!selectedShape) return;
-            
-            // Agregar un marcador en cada vértice del polígono
-            selectedShape.getPath().forEach(function(latLng, index) {
-                const marker = new google.maps.Marker({
-                    position: latLng,
-                    map: map,
-                    icon: {
-                        path: 'M 0,0 C -2,-20 -10,-22 -10,-30 A 10,10 0 1,1 10,-30 C 10,-22 2,-20 0,0 z',
-                        fillColor: '#FF5722',
-                        fillOpacity: 1,
-                        strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
-                        scale: 1.2,
-                        anchor: new google.maps.Point(0, 0)
-                    },
-                    draggable: false,
-                    clickable: false, // No captura clicks
-                    zIndex: -1 // Detrás del polígono para no bloquear interacción
-                });
-                
-                vertexMarkers.push(marker);
-            });
-        }
-
-        function clearVertexMarkers() {
-            // Eliminar todos los marcadores de vértices
-            vertexMarkers.forEach(function(marker) {
-                marker.setMap(null);
-            });
-            vertexMarkers = [];
+            updateSummary();
         }
 
         function undoLastPoint() {
-            if (selectedShape) {
-                const path = selectedShape.getPath();
-                if (path.getLength() > 1) {
-                    path.removeAt(path.getLength() - 1);
-                }
-            }
+            if (markers.length === 0) return;
+
+            // Eliminar último marcador
+            const lastMarker = markers.pop();
+            lastMarker.setMap(null);
+            points.pop();
+
+            // Actualizar polígono
+            polygon.setPath(points);
+
+            // Recalcular área
+            calculateArea();
         }
 
         function clearDrawing() {
-            if (selectedShape) {
-                selectedShape.setMap(null);
-                selectedShape = null;
-                clearVertexMarkers(); // Limpiar marcadores de vértices
-                document.getElementById('total-m2').textContent = '0.00';
-                document.getElementById('total-price').textContent = '$0.00';
-                updateSummary();
-            }
-            // NO limpiar la dirección ni las coordenadas
-            drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+            // Eliminar todos los marcadores
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            points = [];
+
+            // Limpiar polígono
+            polygon.setPath([]);
+
+            // Resetear valores
+            document.getElementById('total-m2').textContent = '0.00';
+            document.getElementById('total-price').textContent = '$0.00';
+            updateSummary();
         }
 
         // Load Products
