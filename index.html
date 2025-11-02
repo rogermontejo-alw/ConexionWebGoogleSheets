@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Área de Techos</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Calculadora de Área de Techos</h1>
+    </header>
+
+    <main class="container">
+        <div class="form-container">
+            <div class="form-section">
+                <h2>1. Ubica tu domicilio</h2>
+                <input type="text" id="address" placeholder="Buscar dirección...">
+            </div>
+
+            <div class="form-section">
+                <h2>2. Calcula tu techo</h2>
+                <p>Dibuja en el mapa el area a cubrir</p>
+                <div class="controls">
+                    <button id="undo-button">Deshacer</button>
+                    <button id="clear-button">Limpiar puntos</button>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>3. Costo estimado</h2>
+                <div class="calculation-box">
+                    <div class="input-group">
+                        <label for="cobertura">Cobertura</label>
+                        <select id="cobertura">
+                            <!-- Opciones se cargarán desde Google Sheets -->
+                        </select>
+                    </div>
+                    <div class="results">
+                        <p>Total m2: <span id="total-m2">0</span></p>
+                        <p>Precio Total: <span id="total-price">$0.00</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>4. Cotiza tu techo</h2>
+                <p>Ingresa tus datos para terminar la cotización</p>
+                <div class="user-inputs">
+                    <input type="text" id="first-name" placeholder="Nombre(s)" required>
+                    <input type="text" id="last-name" placeholder="Apellido(s)">
+                    <input type="tel" id="phone" placeholder="Teléfono" required>
+                    <input type="email" id="email" placeholder="Correo">
+                </div>
+                <button id="quote-button">Cotizar</button>
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Calculadora de Techos. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8zNTIdoYEXz2Rp3l_Xakb125gNxQU-R8&libraries=places,drawing,geometry&callback=initMap"></script>
+</body>
+</html>
