@@ -300,6 +300,59 @@
             border-radius: 8px;
             font-size: 1rem;
             margin-bottom: 1rem;
+            background: var(--white);
+            border: 2px solid var(--border-gray);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .coverage-select:focus {
+            outline: none;
+            border-color: var(--primary-orange);
+        }
+
+        .coverage-select:disabled {
+            background: var(--light-gray);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .tipo-techo-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tipo-techo-option {
+            padding: 1rem;
+            border: 2px solid var(--border-gray);
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--white);
+        }
+
+        .tipo-techo-option:hover {
+            border-color: var(--primary-orange);
+            transform: translateY(-2px);
+        }
+
+        .tipo-techo-option.selected {
+            border-color: var(--primary-orange);
+            background: var(--primary-orange);
+            color: var(--white);
+        }
+
+        .tipo-techo-option .icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .tipo-techo-option .label {
+            font-weight: 600;
+            font-size: 0.95rem;
         }
 
         .results-grid {
@@ -633,7 +686,20 @@
                             </div>
                         </div>
 
-                        <h3 style="margin-top: 1.5rem;">Seleccione el Sistema</h3>
+                        <h3 style="margin-top: 1.5rem;">Seleccione el Tipo de Techo</h3>
+                    <div class="tipo-techo-selector">
+                        <div class="tipo-techo-option" data-tipo="concreto">
+                            
+                            <div class="label">Techo de concreto</div>
+                        </div>
+                        <div class="tipo-techo-option" data-tipo="lamina">
+                            
+                            <div class="label">Techo de lámina</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="tipo-techo" value="">
+
+                    <h3 style="margin-top: 1rem;">Seleccione el Sistema</h3>
                         <select id="cobertura" class="coverage-select">
                             <option value="">Selecciona una opción...</option>
                         </select>
@@ -681,7 +747,7 @@
                     <form id="quote-form">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="first-name">Nombre Completo *</label>
+                                <label for="first-name">Nombre *</label>
                                 <input type="text" id="first-name" placeholder="Tu nombre" required>
                                 <span class="error-message" id="error-first-name">Este campo es obligatorio</span>
                             </div>
@@ -716,24 +782,25 @@
     <!-- Success Message -->
     <div class="success-message" id="success-message">
         <div class="success-icon">✓</div>
-        <h3>¡Cotización enviada con éxito!</h3>
+        <h3>¡Solicitud enviada con éxito!</h3>
         <p>Nos pondremos en contacto contigo pronto.</p>
     </div>
-
-    <script>
+<script>
         // Global Variables
         let map;
         let polygon;
         let markers = [];
         let points = [];
         let autocomplete;
-        let products = [];
+        let productsConcreto = []; // Se llenará al cargar
+        let productsLamina = []; // Se llenará al cargar
         let selectedAddress = '';
         let selectedCoordinates = null;
 
         // Configuration
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1loAhaiLAHh4eTW1wN7dwvXvqbKxNTe2a19oXSFqH490/export?format=csv&gid=0';
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbychzvpX48ijnGNoL7WMKCHFOZWjgFRNZ0l8YDu3uWylTYzEF1Mfvbtc3EY9TXLHeqPzg/exec';
+        const SHEET_CONCRETO_URL = 'https://docs.google.com/spreadsheets/d/1loAhaiLAHh4eTW1wN7dwvXvqbKxNTe2a19oXSFqH490/export?format=csv&gid=0';
+        const SHEET_LAMINA_URL = 'https://docs.google.com/spreadsheets/d/1loAhaiLAHh4eTW1wN7dwvXvqbKxNTe2a19oXSFqH490/export?format=csv&gid=1840202510';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx3Woqvn0eOQfQXiCX4BqP9dY_4JBXUTU6TDNyC6DROUycwrXGvV-gzDuwDWmt6q1MHHA/exec'; 
 
         // Tab Switching
         document.querySelectorAll('.tab-button').forEach(button => {
@@ -765,10 +832,11 @@
         // Continue Button
         document.getElementById('continue-button').addEventListener('click', () => {
             const area = parseFloat(document.getElementById('total-m2').textContent);
+            const tipoTecho = document.getElementById('tipo-techo').value;
             const coverage = document.getElementById('cobertura').value;
 
-            if (area === 0 || !coverage) {
-                alert('Por favor, dibuja un área en el mapa y selecciona un sistema de cobertura.');
+            if (area === 0 || !tipoTecho || !coverage) {
+                alert('Por favor, dibuja un área en el mapa, selecciona el tipo de techo y el sistema de cobertura.');
                 return;
             }
 
@@ -777,11 +845,20 @@
 
         // Update Summary
         function updateSummary() {
-            const system = document.getElementById('cobertura').selectedOptions[0]?.text || '-';
+            const tipoTecho = document.getElementById('tipo-techo').value;
+            const tipoTexto = tipoTecho === 'concreto' ? 'Techo de concreto' : tipoTecho === 'lamina' ? 'Techo de lámina' : '-';
+            
+            let system = '-';
+            const coberturaSelect = document.getElementById('cobertura');
+            if (coberturaSelect.selectedIndex > 0) {
+                 // Tomar solo el nombre del producto, sin los precios
+                system = coberturaSelect.value;
+            }
+
             const area = document.getElementById('total-m2').textContent;
             const price = document.getElementById('total-price').textContent;
 
-            document.getElementById('summary-system').textContent = system;
+            document.getElementById('summary-system').textContent = `${tipoTexto} - ${system}`;
             document.getElementById('summary-area').textContent = area;
             document.getElementById('summary-price').textContent = price;
         }
@@ -854,7 +931,7 @@
         }
 
         function addPoint(location) {
-            // Agregar marcador numerado y arrastrable con imagen SVG personalizada
+            // Agregar marcador numerado y arrastrable
             const marker = new google.maps.Marker({
                 position: location,
                 map: map,
@@ -862,7 +939,7 @@
                     text: (markers.length + 1).toString(),
                     color: 'white',
                     fontWeight: 'bold',
-                    fontSize: '16px'
+                    fontSize: '14px'
                 },
                 icon: {
                     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
@@ -908,7 +985,7 @@
             if (points.length < 3) {
                 document.getElementById('total-m2').textContent = '0.00';
                 document.getElementById('total-price').textContent = '$0.00';
-                calculatePrice();
+                calculatePrice(); // Llama a calculatePrice para resetear
                 updateSummary();
                 return;
             }
@@ -960,54 +1037,58 @@
             // Resetear valores
             document.getElementById('total-m2').textContent = '0.00';
             document.getElementById('total-price').textContent = '$0.00';
+            calculatePrice(); // Llama a calculatePrice para resetear
             updateSummary();
         }
 
-        // Load Products
-        async function loadProducts() {
+        
+        // --- CORRECCIÓN 1: Nueva función para cargar y procesar CUALQUIER hoja de CSV ---
+        async function fetchAndParseProducts(url) {
             try {
-                const response = await fetch(SHEET_URL);
-                if (!response.ok) throw new Error('Network response was not ok');
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Network response was not ok for ${url}`);
                 
                 const csvText = await response.text();
-                const rows = csvText.split('\n').slice(1);
-                const coberturaSelect = document.getElementById('cobertura');
-
-                products = rows.map(row => {
+                const rows = csvText.split('\n').slice(1); // Omitir encabezado
+                
+                return rows.map(row => {
                     const [name, listPrice, cashPrice] = row.split(',');
                     return {
                         name: name?.trim(),
-                        listPrice: parseFloat(listPrice?.replace('$', '').trim() || 0),
-                        cashPrice: parseFloat(cashPrice?.replace('$', '').trim() || 0)
+                        // Limpiar el precio de símbolos '$' o 'MXN' y comas
+                        listPrice: parseFloat(listPrice?.replace(/[^0-9.]/g, '') || 0),
+                        cashPrice: parseFloat(cashPrice?.replace(/[^0-9.]/g, '') || 0)
                     };
-                }).filter(p => p.name);
-
-                products.forEach(product => {
-                    const option = document.createElement('option');
-                    option.value = product.name;
-                    option.textContent = `${product.name} - Lista: $${product.listPrice.toFixed(2)} / Contado: $${product.cashPrice.toFixed(2)}`;
-                    coberturaSelect.appendChild(option);
-                });
-
+                }).filter(p => p.name && !isNaN(p.listPrice)); // Filtrar filas vacías o inválidas
             } catch (error) {
-                console.error('Error loading products:', error);
+                console.error('Error loading products from:', url, error);
+                return []; // Devolver array vacío en caso de error
             }
         }
 
+        // --- CORRECCIÓN 2: `calculatePrice` arreglada ---
         function calculatePrice() {
             const selectedProductName = document.getElementById('cobertura').value;
             const area = parseFloat(document.getElementById('total-m2').textContent);
+            const tipoTecho = document.getElementById('tipo-techo').value;
 
-            if (!selectedProductName || !products.length || isNaN(area)) {
+            // Determinar qué lista de productos usar
+            const currentProducts = tipoTecho === 'concreto' ? productsConcreto : productsLamina;
+
+            if (!selectedProductName || !currentProducts.length || isNaN(area) || !tipoTecho) {
                 document.getElementById('total-price').textContent = '$0.00';
                 return;
             }
 
-            const selectedProduct = products.find(p => p.name === selectedProductName);
+            const selectedProduct = currentProducts.find(p => p.name === selectedProductName);
+            
             if (selectedProduct) {
+                // Usamos "listPrice" como base del cálculo
                 const totalPrice = selectedProduct.listPrice * area;
                 // Formato de moneda con separadores de miles
-                document.getElementById('total-price').textContent = `${totalPrice.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})} MXN`;
+                document.getElementById('total-price').textContent = `$${totalPrice.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})} MXN`;
+            } else {
+                document.getElementById('total-price').textContent = '$0.00';
             }
         }
 
@@ -1069,16 +1150,19 @@
             // Obtener la dirección actual del input
             let fullAddress = document.getElementById('address').value.trim() || selectedAddress || 'Dirección no especificada';
             
-            // Crear enlace de Google Maps con las coordenadas del centro del polígono
+            // --- CORRECCIÓN 3: Formato de URL de Google Maps arreglado ---
             let googleMapsLink = '';
             if (selectedCoordinates) {
                 googleMapsLink = `https://www.google.com/maps?q=${selectedCoordinates.lat},${selectedCoordinates.lng}`;
-                fullAddress += ` (${googleMapsLink})`;
+                fullAddress += ` (Ubicación: ${googleMapsLink})`;
             }
             
             // Extraer solo el número del precio (sin formato)
             const priceText = document.getElementById('total-price').textContent;
             const priceNumber = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+            
+            const tipoTecho = document.getElementById('tipo-techo').value;
+            const tipoTexto = tipoTecho === 'concreto' ? 'Techo de concreto' : 'Techo de lámina';
             
             const data = {
                 firstName: document.getElementById('first-name').value.trim(),
@@ -1086,7 +1170,8 @@
                 phone: document.getElementById('phone').value.trim(),
                 email: document.getElementById('email').value.trim(),
                 address: fullAddress,
-                cobertura: document.getElementById('cobertura').value,
+                tipoTecho: tipoTexto,
+                cobertura: document.getElementById('cobertura').value, // Solo el nombre del sistema
                 totalM2: document.getElementById('total-m2').textContent,
                 totalPrice: priceNumber // Solo el número, sin formato
             };
@@ -1094,6 +1179,8 @@
             const submitButton = document.getElementById('quote-button');
             submitButton.classList.add('loading');
             submitButton.textContent = 'Enviando...';
+
+            // ... (dentro de la función submitQuote) ...
 
             try {
                 const response = await fetch(SCRIPT_URL, {
@@ -1104,52 +1191,147 @@
                     body: JSON.stringify(data)
                 });
 
-                const result = await response.text();
+                const resultText = await response.text();
+                const result = JSON.parse(resultText); // Convertir el texto a JSON
                 console.log('Respuesta del servidor:', result);
 
-                // Mostrar mensaje de éxito
-                document.getElementById('success-message').classList.add('show');
-                setTimeout(() => {
-                    document.getElementById('success-message').classList.remove('show');
+                // --- ¡MEJORA IMPORTANTE! ---
+                // Comprobar si el resultado del SERVIDOR fue exitoso
+                if (result.result === "success") {
                     
-                    // Limpiar formulario
-                    document.getElementById('quote-form').reset();
-                    
-                    // Limpiar validaciones
-                    document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
-                    document.querySelectorAll('.error-message').forEach(el => el.classList.remove('show'));
-                    
-                    // Limpiar dirección y coordenadas
-                    document.getElementById('address').value = '';
-                    selectedAddress = '';
-                    selectedCoordinates = null;
-                    
-                    // En mobile, volver al paso 1
-                    if (window.innerWidth < 1024) {
-                        switchTab('step1');
-                    }
-                    
-                    // Limpiar dibujo
-                    clearDrawing();
-                }, 3000);
+                    // Mostrar mensaje de éxito
+                    document.getElementById('success-message').classList.add('show');
+                    setTimeout(() => {
+                        document.getElementById('success-message').classList.remove('show');
+                        
+                        // Limpiar formulario
+                        document.getElementById('quote-form').reset();
+                        
+                        // Limpiar validaciones
+                        document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+                        document.querySelectorAll('.error-message').forEach(el => el.classList.remove('show'));
+                        
+                        // Limpiar dirección y coordenadas
+                        document.getElementById('address').value = '';
+                        selectedAddress = '';
+                        selectedCoordinates = null;
+                        
+                        // En mobile, volver al paso 1
+                        if (window.innerWidth < 1024) {
+                            switchTab('step1');
+                        }
+                        
+                        // Limpiar dibujo
+                        clearDrawing();
+                    }, 3000);
+
+                } else {
+                    // Si el servidor devolvió un error, mostrarlo
+                    console.error('Error del servidor:', result.message);
+                    alert('Hubo un error al guardar la cotización: ' + result.message);
+                }
 
             } catch (error) {
-                console.error('Error detallado:', error);
-                alert('Hubo un error al enviar la cotización. Por favor, inténtalo de nuevo.');
+                // Esto atrapa errores de red (ej. sin internet)
+                console.error('Error detallado de red:', error);
+                alert('Hubo un error de conexión al enviar la cotización. Por favor, inténtalo de nuevo.');
+            
             } finally {
                 submitButton.classList.remove('loading');
                 submitButton.innerHTML = '<span>COTIZAR AHORA</span><span>→</span>';
             }
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            loadProducts();
+        // --- CORRECCIÓN 4: Lógica de inicialización `DOMContentLoaded` arreglada ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            
+            // Cargar AMBAS listas de productos en paralelo al iniciar
+            const [concretoResults, laminaResults] = await Promise.all([
+                fetchAndParseProducts(SHEET_CONCRETO_URL),
+                fetchAndParseProducts(SHEET_LAMINA_URL)
+            ]);
+
+            // Asignar a las variables globales
+            productsConcreto = concretoResults;
+            productsLamina = laminaResults;
+            
+            console.log('Productos de concreto cargados:', productsConcreto.length);
+            console.log('Productos de lámina cargados:', productsLamina.length);
+            
+            // Selector visual de tipo de techo
+            document.querySelectorAll('.tipo-techo-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    // Remover selección anterior
+                    document.querySelectorAll('.tipo-techo-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Seleccionar esta opción
+                    this.classList.add('selected');
+                    
+                    // Actualizar valor del input hidden
+                    const tipo = this.dataset.tipo;
+                    document.getElementById('tipo-techo').value = tipo;
+                    
+                    // Actualizar opciones de cobertura
+                    actualizarOpcionesCobertura();
+                    calculatePrice(); // recalcular precio
+                    updateSummary(); // actualizar resumen
+                });
+            });
+            
+            // Listener para cobertura
             document.getElementById('cobertura').addEventListener('change', () => {
                 calculatePrice();
-                updateSummary(); // Update summary in real-time on desktop
+                updateSummary();
             });
+
+            // Llamar una vez al inicio para deshabilitar el select
+            actualizarOpcionesCobertura();
         });
+
+        // --- CORRECCIÓN 5: `actualizarOpcionesCobertura` ahora usa las variables globales correctas ---
+        function actualizarOpcionesCobertura() {
+            const tipoTecho = document.getElementById('tipo-techo').value;
+            const coberturaSelect = document.getElementById('cobertura');
+            
+            console.log('Actualizando opciones de cobertura. Tipo seleccionado:', tipoTecho);
+            
+            // Limpiar opciones actuales
+            coberturaSelect.innerHTML = '<option value="">Selecciona una opción...</option>';
+            
+            if (!tipoTecho) {
+                coberturaSelect.disabled = true;
+                console.log('No hay tipo de techo seleccionado, select deshabilitado');
+                return;
+            }
+            
+            coberturaSelect.disabled = false;
+            
+            // Seleccionar productos según el tipo de techo
+            const products = tipoTecho === 'concreto' ? productsConcreto : productsLamina;
+            
+            console.log('Productos a cargar:', products.length);
+            
+            if (!products || products.length === 0) {
+                console.warn('⚠️ No hay productos disponibles para:', tipoTecho);
+                coberturaSelect.innerHTML = '<option value="">No hay productos disponibles</option>';
+                return;
+            }
+            
+            // Llenar el select con los productos
+            products.forEach(product => {
+                if (product.name) {
+                    const option = document.createElement('option');
+                    option.value = product.name; // El valor es solo el nombre
+                    // El texto muestra los precios
+                    option.textContent = `${product.name} - Lista: $${product.listPrice.toFixed(2)} / Contado: $${product.cashPrice.toFixed(2)}`;
+                    coberturaSelect.appendChild(option);
+                }
+            });
+            
+            console.log('✅ Opciones de cobertura actualizadas:', coberturaSelect.options.length - 1, 'productos');
+        }
     </script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8zNTIdoYEXz2Rp3l_Xakb125gNxQU-R8&libraries=places,drawing,geometry&callback=initMap"></script>
 </body>
